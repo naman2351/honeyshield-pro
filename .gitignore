@@ -1,0 +1,32 @@
+# Virtual environment
+venv/
+.env
+*.env
+
+# Database (don't commit sensitive data)
+data/*.db
+*.db
+
+# Logs
+logs/*.log
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/
