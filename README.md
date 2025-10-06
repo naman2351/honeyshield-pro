@@ -1,4 +1,4 @@
-# 🛡️ Honeyshield MVP
+# 🛡️ Honeyshield-pro
 
 A real-time honey trap detection system using fake LinkedIn accounts to identify and investigate acts of social engineering.  
 
@@ -19,3 +19,4 @@ This project demonstrates:
     Behavioral analysis automation
     Real-time monitoring systems
     Cybersecurity portfolio development
+
