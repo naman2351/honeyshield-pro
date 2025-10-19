@@ -1,34 +1,41 @@
-linkedin:
-  email: "your_decoy_email@protonmail.com"
-  password: "your_secure_password"
-  profile_url: "https://www.linkedin.com/in/your-decoy-profile"
+# Honeyshield Advanced Configuration
+# ML-First Approach - No Fallbacks
+
+model:
+  path: "models/advanced_phishing_detector.pkl"
+  retrain_interval_days: 30
+  confidence_threshold: 0.7
+  feature_engineering: true
 
 analysis:
-  suspicious_keywords:
-    - "confidential"
-    - "classified"
-    - "sensitive"
-    - "urgent"
-    - "immediate"
-    - "offer"
-    - "opportunity"
-    - "investment"
-    - "business proposal"
-    - "meet me"
-    - "personal number"
-    - "WhatsApp"
-    - "Telegram"
-  
-  high_risk_phrases:
-    - "government contract"
-    - "military project"
-    - "defense"
-    - "nuclear"
-    - "we need to talk privately"
-    - "can we move to another app"
+  approach: "ml_first"
+  min_confidence: 0.6
+  enable_behavioral_analysis: true
+  enable_temporal_analysis: true
+  threat_classification: true
 
-scoring:
-  keyword_weight: 5
-  sentiment_weight: 3
-  relationship_escalation_weight: 10
-  request_private_info_weight: 15
+monitoring:
+  check_interval_hours: 2
+  max_messages_per_cycle: 100
+  enable_real_time: false  # Set to true for production
+
+linkedin:
+  # Note: Actual credentials should be in environment variables
+  profiles:
+    - name: "Security Researcher"
+      industry: "Information Technology"
+      experience: "Senior"
+    - name: "Business Executive" 
+      industry: "Management"
+      experience: "Director"
+
+logging:
+  level: "INFO"
+  file: "logs/honeyshield_advanced.log"
+  enable_analysis_logs: true
+
+dashboard:
+  refresh_interval: 30
+  enable_ml_insights: true
+  show_confidence_scores: true
+  threat_visualization: true
