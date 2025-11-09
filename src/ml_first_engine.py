@@ -25,14 +25,19 @@ class MLFirstAnalysisEngine:
         with open('config/config.yaml', 'r') as file:
             self.config = yaml.safe_load(file)
     
-    def load_model(self, model_path: str):
-        """Load pre-trained ML model - REQUIRED before analysis"""
-        try:
-            self.ml_detector.load_model(model_path)
-            self.model_loaded = True
-            logging.info("✅ ML model loaded successfully")
-        except Exception as e:
-            raise RuntimeError(f"Failed to load ML model: {e}. Model must be trained first.")
+def load_model(self, model_path: str):
+    """Load pre-trained ML model - REQUIRED before analysis"""
+    try:
+        import pickle
+        with open(model_path, 'rb') as f:
+            model_data = pickle.load(f)  # Fixed: was pickle.dump() which is for saving
+        self.ml_detector.vectorizer = model_data['vectorizer']
+        self.ml_detector.classifier = model_data['classifier']
+        self.ml_detector.is_trained = model_data['is_trained']
+        self.model_loaded = True
+        logging.info("✅ ML model loaded successfully")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load ML model: {e}. Model must be trained first.")
     
     def analyze_message(self, message_content: str, sender_info: Dict = None) -> Dict[str, Any]:
         """

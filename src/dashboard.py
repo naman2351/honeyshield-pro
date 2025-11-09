@@ -1,8 +1,6 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, timedelta
 import json
 import sys
@@ -11,71 +9,130 @@ import os
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-class MLFirstDashboard:
+class AlertDashboard:
     def __init__(self):
         self.setup_page()
         self.ensure_database_exists()
     
     def setup_page(self):
-        """Configure Streamlit page settings"""
+        """Configure Streamlit page for security operations"""
         st.set_page_config(
-            page_title="Honeyshield ML Dashboard",
-            page_icon="🤖",
+            page_title="Honeyshield Security Dashboard",
+            page_icon="🛡️",
             layout="wide",
             initial_sidebar_state="expanded"
         )
         
-        # Custom CSS
+        # Security-focused CSS
         st.markdown("""
         <style>
         .critical-alert {
-            background-color: #ff4444;
-            padding: 10px;
-            border-radius: 5px;
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            padding: 15px;
+            border-radius: 8px;
             color: white;
-            font-weight: bold;
+            border-left: 5px solid #ff0000;
+            margin: 10px 0px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .critical-alert:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(255, 0, 0, 0.3);
         }
         .high-alert {
-            background-color: #ff6b6b;
-            padding: 8px;
-            border-radius: 5px;
+            background: linear-gradient(45deg, #ff6b6b, #ff4444);
+            padding: 12px;
+            border-radius: 8px;
             color: white;
+            border-left: 5px solid #ff4444;
+            margin: 8px 0px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .high-alert:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
         }
         .medium-alert {
-            background-color: #ffa726;
-            padding: 6px;
-            border-radius: 5px;
-            color: white;
-        }
-        .ml-insight {
-            background-color: #e3f2fd;
+            background: linear-gradient(45deg, #ffa726, #ff9800);
             padding: 10px;
-            border-radius: 5px;
-            border-left: 4px solid #2196f3;
+            border-radius: 8px;
+            color: white;
+            border-left: 5px solid #ff9800;
+            margin: 6px 0px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .medium-alert:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(255, 167, 38, 0.3);
+        }
+        .low-alert {
+            background: linear-gradient(45deg, #4caf50, #388e3c);
+            padding: 8px;
+            border-radius: 8px;
+            color: white;
+            border-left: 5px solid #388e3c;
+            margin: 4px 0px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .low-alert:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+        .alert-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            margin: 10px 0px;
+        }
+        .security-metric {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .resolved-alert {
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 5px solid #28a745;
+            margin: 5px 0px;
+            color: #155724;
         }
         </style>
         """, unsafe_allow_html=True)
     
     def ensure_database_exists(self):
-        """Ensure database file and tables exist"""
+        """Ensure database file and tables exist with alert-focused schema"""
         try:
             os.makedirs('data', exist_ok=True)
             conn = sqlite3.connect('data/honeyshield.db')
             cursor = conn.cursor()
             
+            # Enhanced alerts table
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS messages (
+                CREATE TABLE IF NOT EXISTS security_alerts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender_name TEXT NOT NULL,
-                    sender_profile_url TEXT,
-                    message_content TEXT NOT NULL,
+                    alert_id TEXT UNIQUE,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    risk_score INTEGER DEFAULT 0,
-                    risk_level TEXT DEFAULT 'Low',
-                    keywords_found TEXT,
-                    analysis_notes TEXT,
-                    ml_confidence REAL DEFAULT 0.0,
-                    threat_types TEXT
+                    severity TEXT NOT NULL,
+                    status TEXT DEFAULT 'OPEN',
+                    source_platform TEXT,
+                    sender_name TEXT,
+                    sender_profile TEXT,
+                    message_content TEXT,
+                    risk_score INTEGER,
+                    threat_type TEXT,
+                    indicators TEXT,
+                    recommended_action TEXT,
+                    analyst_notes TEXT,
+                    ml_confidence REAL,
+                    resolved_at DATETIME
                 )
             ''')
             
@@ -85,414 +142,510 @@ class MLFirstDashboard:
         except Exception as e:
             st.error(f"Database initialization error: {e}")
     
-    def get_advanced_stats(self):
-        """Get comprehensive statistics with ML insights"""
+    def get_security_overview(self):
+        """Get security overview statistics"""
         try:
             conn = sqlite3.connect('data/honeyshield.db')
-            
-            # Basic stats
             cursor = conn.cursor()
+            
             cursor.execute('''
                 SELECT 
-                    COUNT(*) as total_messages,
-                    SUM(CASE WHEN risk_level = 'CRITICAL' THEN 1 ELSE 0 END) as critical,
-                    SUM(CASE WHEN risk_level = 'HIGH' THEN 1 ELSE 0 END) as high,
-                    SUM(CASE WHEN risk_level = 'MEDIUM' THEN 1 ELSE 0 END) as medium,
-                    SUM(CASE WHEN risk_level = 'LOW' THEN 1 ELSE 0 END) as low,
-                    AVG(risk_score) as avg_score,
-                    AVG(ml_confidence) as avg_confidence
-                FROM messages
+                    COUNT(*) as total_alerts,
+                    SUM(CASE WHEN severity = 'CRITICAL' AND status = 'OPEN' THEN 1 ELSE 0 END) as open_critical,
+                    SUM(CASE WHEN severity = 'HIGH' AND status = 'OPEN' THEN 1 ELSE 0 END) as open_high,
+                    SUM(CASE WHEN severity = 'MEDIUM' AND status = 'OPEN' THEN 1 ELSE 0 END) as open_medium,
+                    SUM(CASE WHEN status = 'RESOLVED' THEN 1 ELSE 0 END) as resolved,
+                    MAX(timestamp) as latest_alert
+                FROM security_alerts
             ''')
             
             stats = cursor.fetchone()
-            
-            # Threat type analysis
-            cursor.execute('''
-                SELECT threat_types, COUNT(*) as count
-                FROM messages 
-                WHERE threat_types IS NOT NULL AND threat_types != ''
-                GROUP BY threat_types
-            ''')
-            
-            threat_data = cursor.fetchall()
-            
-            # Temporal analysis
-            cursor.execute('''
-                SELECT 
-                    strftime('%H', timestamp) as hour,
-                    COUNT(*) as message_count,
-                    AVG(risk_score) as avg_risk
-                FROM messages 
-                GROUP BY hour
-                ORDER BY hour
-            ''')
-            
-            temporal_data = cursor.fetchall()
-            
             conn.close()
             
             return {
-                'total_messages': stats[0] or 0,
-                'critical_alerts': stats[1] or 0,
-                'high_alerts': stats[2] or 0,
-                'medium_alerts': stats[3] or 0,
-                'low_alerts': stats[4] or 0,
-                'avg_risk_score': stats[5] or 0,
-                'avg_confidence': stats[6] or 0,
-                'threat_distribution': threat_data,
-                'temporal_patterns': temporal_data
+                'total_alerts': stats[0] or 0,
+                'open_critical': stats[1] or 0,
+                'open_high': stats[2] or 0,
+                'open_medium': stats[3] or 0,
+                'resolved_alerts': stats[4] or 0,
+                'latest_alert': stats[5] or 'No alerts'
             }
             
         except Exception as e:
-            st.error(f"Error getting stats: {e}")
+            st.error(f"Error getting security overview: {e}")
             return None
     
-    def display_ml_insights_header(self):
-        """Display the main header with ML focus"""
-        st.title("🤖 Honeyshield ML-First Dashboard")
-        st.markdown("""
-        **AI-Powered Social Engineering Detection** · Real-time ML Analysis · Behavioral Threat Intelligence
-        """)
+    def display_security_header(self):
+        """Display security operations header"""
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.title("🛡️ Honeyshield Security Operations")
+            st.markdown("**Real-time Social Engineering Threat Detection & Response**")
+        
+        with col2:
+            st.metric("Last Update", datetime.now().strftime("%H:%M:%S"))
+        
         st.markdown("---")
     
-    def display_ml_metrics(self, stats):
-        """Display ML-focused metrics"""
-        st.header("🎯 ML Detection Metrics")
+    def display_security_metrics(self, overview):
+        """Display security operations metrics"""
+        st.header("📊 Security Overview")
         
-        if not stats:
-            st.info("No data available yet. Run the monitoring system to collect data.")
+        if not overview:
+            st.info("No security data available. Alerts will appear here when detected.")
             return
         
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
-            st.metric("Total Messages", stats['total_messages'])
+            st.metric(
+                "Open Critical", 
+                overview['open_critical'],
+                delta=None,
+                delta_color="inverse"
+            )
         
         with col2:
-            st.metric("Critical Alerts", stats['critical_alerts'], delta=None)
+            st.metric(
+                "Open High", 
+                overview['open_high'],
+                delta=None,
+                delta_color="inverse"
+            )
         
         with col3:
-            st.metric("High Confidence", f"{stats['avg_confidence']:.1%}")
+            st.metric(
+                "Total Alerts", 
+                overview['total_alerts']
+            )
         
         with col4:
-            st.metric("Avg Risk Score", f"{stats['avg_risk_score']:.1f}")
+            st.metric(
+                "Resolved", 
+                overview['resolved_alerts']
+            )
         
         with col5:
-            detection_rate = (stats['critical_alerts'] + stats['high_alerts']) / max(stats['total_messages'], 1)
-            st.metric("Threat Detection Rate", f"{detection_rate:.1%}")
-    
-    def display_risk_distribution_chart(self, stats):
-        """Display interactive risk distribution chart"""
-        if not stats or stats['total_messages'] == 0:
-            return
-        
-        st.header("📊 Risk Distribution Analysis")
-        
-        # Risk level distribution
-        risk_data = {
-            'Level': ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
-            'Count': [
-                stats['critical_alerts'],
-                stats['high_alerts'], 
-                stats['medium_alerts'],
-                stats['low_alerts']
-            ],
-            'Color': ['#ff4444', '#ff6b6b', '#ffa726', '#4caf50']
-        }
-        
-        fig = go.Figure(data=[
-            go.Bar(
-                x=risk_data['Level'],
-                y=risk_data['Count'],
-                marker_color=risk_data['Color'],
-                text=risk_data['Count'],
-                textposition='auto',
+            st.metric(
+                "Latest Alert", 
+                overview['latest_alert'][:16] if overview['latest_alert'] != 'No alerts' else 'No alerts'
             )
-        ])
-        
-        fig.update_layout(
-            title="Message Risk Level Distribution",
-            xaxis_title="Risk Level",
-            yaxis_title="Message Count",
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
     
-    def display_threat_intelligence(self, stats):
-        """Display threat intelligence insights"""
-        st.header("🎭 Threat Intelligence")
+    def display_active_alerts_section(self):
+        """Display active security alerts with clickable interface"""
+        st.header("🚨 Active Security Alerts")
         
-        if not stats or not stats['threat_distribution']:
-            st.info("No threat classification data available yet.")
-            return
-        
-        col1, col2 = st.columns(2)
-        
+        # Filter options
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.subheader("Threat Type Analysis")
-            for threat_type, count in stats['threat_distribution'][:5]:  # Top 5
-                try:
-                    threat_data = json.loads(threat_type)
-                    primary_type = threat_data.get('primary_types', ['Unknown'])[0]
-                    st.write(f"**{primary_type}**: {count} occurrences")
-                except:
-                    st.write(f"**{threat_type}**: {count} occurrences")
-        
+            show_severity = st.selectbox(
+                "Filter by Severity",
+                ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"]
+            )
         with col2:
-            st.subheader("ML Confidence Distribution")
-            if stats['avg_confidence'] > 0:
-                confidence_gauge = go.Figure(go.Indicator(
-                    mode = "gauge+number",
-                    value = stats['avg_confidence'] * 100,
-                    domain = {'x': [0, 1], 'y': [0, 1]},
-                    title = {'text': "Avg ML Confidence"},
-                    gauge = {
-                        'axis': {'range': [None, 100]},
-                        'bar': {'color': "darkblue"},
-                        'steps': [
-                            {'range': [0, 50], 'color': "lightgray"},
-                            {'range': [50, 80], 'color': "yellow"},
-                            {'range': [80, 100], 'color': "lightgreen"}
-                        ]
-                    }
-                ))
-                st.plotly_chart(confidence_gauge, use_container_width=True)
-    
-    def display_recent_detections(self):
-        """Display recent ML detections with detailed analysis"""
-        st.header("🔍 Recent ML Detections")
+            sort_by = st.selectbox(
+                "Sort by",
+                ["Newest First", "Highest Risk", "Oldest First"]
+            )
+        with col3:
+            if st.button("🔄 Refresh Alerts", use_container_width=True):
+                st.rerun()
         
         try:
             conn = sqlite3.connect('data/honeyshield.db')
             
-            # Get recent messages with ML analysis
+            # Build query based on filters
             query = '''
                 SELECT 
-                    timestamp, sender_name, message_content, risk_score, risk_level,
-                    keywords_found, analysis_notes, ml_confidence, threat_types
-                FROM messages 
-                ORDER BY timestamp DESC 
-                LIMIT 15
+                    alert_id, timestamp, severity, status, source_platform,
+                    sender_name, sender_profile, message_content, risk_score,
+                    threat_type, indicators, recommended_action, ml_confidence
+                FROM security_alerts 
+                WHERE status = 'OPEN'
+            '''
+            
+            params = []
+            
+            if show_severity != "ALL":
+                query += ' AND severity = ?'
+                params.append(show_severity)
+            
+            # Add sorting
+            if sort_by == "Newest First":
+                query += ' ORDER BY timestamp DESC'
+            elif sort_by == "Highest Risk":
+                query += ' ORDER BY risk_score DESC'
+            else:
+                query += ' ORDER BY timestamp ASC'
+            
+            query += ' LIMIT 50'
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            conn.close()
+            
+            if df.empty:
+                st.success("🎉 No active security alerts! All systems secure.")
+                return
+            
+            # Display each alert as clickable card
+            for _, alert in df.iterrows():
+                self._display_clickable_alert_card(alert)
+                
+        except Exception as e:
+            st.error(f"Error loading alerts: {e}")
+    
+    def _display_clickable_alert_card(self, alert):
+        """Display individual security alert as clickable card"""
+        severity_config = {
+            'CRITICAL': {'class': 'critical-alert', 'emoji': '🚨', 'color': '#ff4444'},
+            'HIGH': {'class': 'high-alert', 'emoji': '⚠️', 'color': '#ff6b6b'},
+            'MEDIUM': {'class': 'medium-alert', 'emoji': '🔍', 'color': '#ffa726'},
+            'LOW': {'class': 'low-alert', 'emoji': 'ℹ️', 'color': '#4caf50'}
+        }
+        
+        config = severity_config.get(alert['severity'], severity_config['MEDIUM'])
+        
+        # Create a unique key for this alert
+        alert_key = f"alert_{alert['alert_id']}"
+        
+        # Check if this alert is expanded
+        is_expanded = st.session_state.get(alert_key, False)
+        
+        # Alert Header (Clickable)
+        col1, col2, col3 = st.columns([3, 2, 1])
+        
+        with col1:
+            if st.button(
+                f"{config['emoji']} **ALERT {alert['alert_id']}** | "
+                f"Severity: **{alert['severity']}** | "
+                f"Score: **{alert['risk_score']}/100**",
+                key=f"btn_{alert_key}",
+                use_container_width=True
+            ):
+                # Toggle expansion state
+                st.session_state[alert_key] = not is_expanded
+                st.rerun()
+        
+        with col2:
+            st.write(f"**Time:** {alert['timestamp'][:16]}")
+            st.write(f"**Source:** {alert['source_platform']}")
+        
+        with col3:
+            if st.button("✅ Resolve", key=f"resolve_{alert_key}"):
+                self._resolve_alert(alert['alert_id'])
+                st.rerun()
+        
+        # Alert Details (Expanded View)
+        if st.session_state.get(alert_key, False):
+            with st.container():
+                st.markdown('<div class="alert-details">', unsafe_allow_html=True)
+                
+                st.subheader("🔍 Alert Details")
+                
+                # Main alert information in columns
+                col_a, col_b = st.columns(2)
+                
+                with col_a:
+                    st.write("**Threat Information**")
+                    st.write(f"**Sender:** {alert['sender_name']}")
+                    if alert['sender_profile']:
+                        st.write(f"**Profile:** {alert['sender_profile']}")
+                    st.write(f"**Threat Type:** {alert['threat_type']}")
+                    if alert['ml_confidence']:
+                        st.write(f"**ML Confidence:** {alert['ml_confidence']:.1%}")
+                    st.write(f"**Detection Time:** {alert['timestamp']}")
+                
+                with col_b:
+                    st.write("**Detection Analysis**")
+                    if alert['indicators'] and alert['indicators'] != 'None':
+                        st.write("**Key Indicators:**")
+                        indicators = alert['indicators'].split(', ')
+                        for indicator in indicators:
+                            st.write(f"• {indicator}")
+                
+                # Message Content
+                st.write("**Message Content:**")
+                st.info(alert['message_content'])
+                
+                # Recommended Action
+                st.write("**Recommended Action:**")
+                if alert['severity'] in ['CRITICAL', 'HIGH']:
+                    st.error(alert['recommended_action'])
+                else:
+                    st.warning(alert['recommended_action'])
+                
+                # Action Buttons
+                col_x, col_y, col_z = st.columns(3)
+                with col_x:
+                    if st.button("📋 Copy Alert Details", key=f"copy_{alert_key}"):
+                        self._copy_alert_details(alert)
+                with col_y:
+                    if st.button("📧 Export Alert", key=f"export_{alert_key}"):
+                        self._export_single_alert(alert)
+                with col_z:
+                    if st.button("❌ Close Details", key=f"close_{alert_key}"):
+                        st.session_state[alert_key] = False
+                        st.rerun()
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown("---")
+    
+    def display_recently_resolved(self):
+        """Display recently resolved alerts"""
+        st.header("✅ Recently Resolved Alerts")
+        
+        try:
+            conn = sqlite3.connect('data/honeyshield.db')
+            
+            query = '''
+                SELECT 
+                    alert_id, timestamp, severity, sender_name, 
+                    threat_type, risk_score, resolved_at
+                FROM security_alerts 
+                WHERE status = 'RESOLVED'
+                ORDER BY resolved_at DESC
+                LIMIT 10
             '''
             
             df = pd.read_sql_query(query, conn)
             conn.close()
             
             if df.empty:
-                st.info("No detection data available. Run the monitoring system to collect data.")
+                st.info("No resolved alerts yet.")
                 return
             
-            # Display each detection
-            for _, row in df.iterrows():
-                self._display_detection_card(row)
+            for _, alert in df.iterrows():
+                st.markdown(f'''
+                <div class="resolved-alert">
+                    🔒 <strong>{alert['alert_id']}</strong> | {alert['severity']} | 
+                    {alert['sender_name']} | Resolved: {alert['resolved_at'][:16]}
+                </div>
+                ''', unsafe_allow_html=True)
                 
         except Exception as e:
-            st.error(f"Error loading detections: {e}")
+            st.error(f"Error loading resolved alerts: {e}")
     
-    def _display_detection_card(self, row):
-        """Display individual detection card with ML insights"""
-        # Risk level styling
-        risk_config = {
-            'CRITICAL': {'color': 'red', 'emoji': '🚨', 'class': 'critical-alert'},
-            'HIGH': {'color': 'orange', 'emoji': '⚠️', 'class': 'high-alert'},
-            'MEDIUM': {'color': 'yellow', 'emoji': '🔍', 'class': 'medium-alert'},
-            'LOW': {'color': 'green', 'emoji': '✅', 'class': ''}
-        }
-        
-        config = risk_config.get(row['risk_level'], risk_config['LOW'])
-        
-        with st.container():
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.markdown(f"<div class='{config['class']}'>"
-                          f"{config['emoji']} **{row['sender_name']}** - {row['risk_level']} Risk "
-                          f"(Score: {row['risk_score']}/100)"
-                          f"</div>", unsafe_allow_html=True)
-                
-                # Message preview
-                st.text_area("Message", row['message_content'], height=80, key=f"msg_{row.name}", disabled=True)
-            
-            with col2:
-                st.metric("ML Confidence", f"{row['ml_confidence']:.1%}" if row['ml_confidence'] else "N/A")
-                st.write(f"**Time:** {row['timestamp'][:16]}")
-            
-            # Expandable detailed analysis
-            with st.expander("View ML Analysis Details"):
-                col_a, col_b = st.columns(2)
-                
-                with col_a:
-                    if row['keywords_found'] and row['keywords_found'] != 'None':
-                        st.write("**Key Indicators:**")
-                        indicators = row['keywords_found'].split(', ')
-                        for indicator in indicators[:5]:
-                            st.write(f"• {indicator}")
-                
-                with col_b:
-                    if row['threat_types'] and row['threat_types'] != 'None':
-                        try:
-                            threat_data = json.loads(row['threat_types'])
-                            st.write("**Threat Classification:**")
-                            for threat_type in threat_data.get('primary_types', []):
-                                st.write(f"• {threat_type}")
-                        except:
-                            st.write("**Threat Info:**", row['threat_types'])
-                
-                if row['analysis_notes'] and row['analysis_notes'] != 'None':
-                    st.write("**ML Analysis Notes:**")
-                    st.info(row['analysis_notes'])
-            
-            st.markdown("---")
-    
-    def display_system_health(self):
-        """Display system health and ML model status"""
-        st.header("💻 System Health")
+    def display_alert_actions(self):
+        """Display alert management actions"""
+        st.header("🔧 Alert Management")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # Database health
-            try:
-                conn = sqlite3.connect('data/honeyshield.db')
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM messages")
-                count = cursor.fetchone()[0]
-                conn.close()
-                
-                st.success("✅ Database Connected")
-                st.metric("Stored Messages", count)
-            except:
-                st.error("❌ Database Issue")
-        
-        with col2:
-            # ML Model status
-            model_path = "models/advanced_phishing_detector.pkl"
-            if os.path.exists(model_path):
-                st.success("✅ ML Model Loaded")
-                model_time = datetime.fromtimestamp(os.path.getmtime(model_path))
-                st.metric("Model Updated", model_time.strftime("%Y-%m-%d"))
-            else:
-                st.warning("⚠️ ML Model Not Found")
-                st.info("Run: python train_advanced_model.py")
-        
-        with col3:
-            # System status
-            st.success("✅ Dashboard Active")
-            st.metric("Last Refresh", datetime.now().strftime("%H:%M:%S"))
-    
-    def display_real_time_testing(self):
-        """Display real-time testing interface"""
-        st.header("🧪 Real-time ML Testing")
-        
-        # Test message input
-        test_message = st.text_area(
-            "Test Message Input",
-            placeholder="Paste a suspicious message here to test ML detection...",
-            height=100
-        )
-        
-        if st.button("🔍 Analyze with ML", type="primary") and test_message:
-            with st.spinner("ML analysis in progress..."):
-                try:
-                    from ml_first_engine import MLFirstAnalysisEngine
-                    
-                    # Initialize and load model
-                    engine = MLFirstAnalysisEngine()
-                    engine.load_model("models/advanced_phishing_detector.pkl")
-                    
-                    # Analyze the message
-                    result = engine.analyze_message(test_message)
-                    
-                    # Display results
-                    st.subheader("🤖 ML Analysis Results")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.metric("Risk Score", f"{result['final_score']}/100")
-                    
-                    with col2:
-                        st.metric("Risk Level", result['risk_level'])
-                    
-                    with col3:
-                        st.metric("ML Confidence", f"{result['ml_analysis']['confidence']:.1%}")
-                    
-                    # Detailed analysis
-                    with st.expander("View Detailed Analysis"):
-                        if result['key_indicators']:
-                            st.write("**Key Detection Indicators:**")
-                            for indicator in result['key_indicators']:
-                                st.write(f"• {indicator}")
-                        
-                        if result['behavioral_patterns']:
-                            st.write("**Behavioral Patterns:**")
-                            for pattern in result['behavioral_patterns']:
-                                st.write(f"• {pattern}")
-                        
-                        st.write("**Recommended Action:**")
-                        st.info(result['recommended_action'])
-                        
-                except Exception as e:
-                    st.error(f"Analysis failed: {e}")
-                    st.info("Make sure the ML model is trained and available at models/advanced_phishing_detector.pkl")
-    
-    def run(self):
-        """Run the advanced dashboard"""
-        # Sidebar
-        with st.sidebar:
-            st.title("🤖 Navigation")
-            st.markdown("---")
-            st.markdown("**ML Model Status**")
-            
-            # Model status in sidebar
-            model_path = "models/advanced_phishing_detector.pkl"
-            if os.path.exists(model_path):
-                st.success("✅ ML Model Ready")
-            else:
-                st.error("❌ Train ML Model First")
-                if st.button("Train Model"):
-                    st.info("Run: python train_advanced_model.py")
-            
-            st.markdown("---")
-            st.markdown("**Quick Actions**")
-            if st.button("🔄 Refresh Data"):
+            if st.button("🔄 Refresh All Data", use_container_width=True):
                 st.rerun()
             
+            if st.button("📋 Export All Alerts", use_container_width=True):
+                self._export_alert_report()
+        
+        with col2:
+            if st.button("🚨 Test Alert System", use_container_width=True):
+                self._test_alert_system()
+            
+            if st.button("🗑️ Clear Resolved Alerts", use_container_width=True):
+                self._clear_resolved_alerts()
+        
+        with col3:
+            if st.button("📊 System Status", use_container_width=True):
+                self._show_system_status()
+    
+    def _resolve_alert(self, alert_id):
+        """Mark an alert as resolved"""
+        try:
+            conn = sqlite3.connect('data/honeyshield.db')
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE security_alerts 
+                SET status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP
+                WHERE alert_id = ?
+            ''', (alert_id,))
+            
+            conn.commit()
+            conn.close()
+            
+            st.success(f"Alert {alert_id} marked as resolved")
+            
+        except Exception as e:
+            st.error(f"Error resolving alert: {e}")
+    
+    def _copy_alert_details(self, alert):
+        """Copy alert details to clipboard"""
+        alert_text = f"""
+Alert ID: {alert['alert_id']}
+Severity: {alert['severity']}
+Risk Score: {alert['risk_score']}/100
+Time: {alert['timestamp']}
+Sender: {alert['sender_name']}
+Threat Type: {alert['threat_type']}
+Message: {alert['message_content']}
+Recommended Action: {alert['recommended_action']}
+        """
+        st.code(alert_text, language='text')
+        st.success("Alert details copied to clipboard (select and copy the text above)")
+    
+    def _export_single_alert(self, alert):
+        """Export single alert as text file"""
+        alert_text = f"""
+HONEYSHIELD SECURITY ALERT REPORT
+=================================
+
+ALERT ID: {alert['alert_id']}
+SEVERITY: {alert['severity']}
+RISK SCORE: {alert['risk_score']}/100
+TIMESTAMP: {alert['timestamp']}
+STATUS: {alert['status']}
+
+THREAT INFORMATION:
+- Source Platform: {alert['source_platform']}
+- Sender: {alert['sender_name']}
+- Sender Profile: {alert['sender_profile']}
+- Threat Type: {alert['threat_type']}
+- ML Confidence: {alert['ml_confidence']:.1% if alert['ml_confidence'] else 'N/A'}
+
+MESSAGE CONTENT:
+{alert['message_content']}
+
+DETECTION INDICATORS:
+{alert['indicators']}
+
+RECOMMENDED ACTION:
+{alert['recommended_action']}
+
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        """
+        
+        st.download_button(
+            label="📥 Download This Alert",
+            data=alert_text,
+            file_name=f"alert_{alert['alert_id']}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+            mime="text/plain"
+        )
+    
+    def _export_alert_report(self):
+        """Export all alerts as CSV report"""
+        try:
+            conn = sqlite3.connect('data/honeyshield.db')
+            
+            query = '''
+                SELECT 
+                    alert_id, timestamp, severity, status, source_platform,
+                    sender_name, threat_type, risk_score, ml_confidence
+                FROM security_alerts 
+                ORDER BY timestamp DESC
+            '''
+            
+            df = pd.read_sql_query(query, conn)
+            conn.close()
+            
+            csv = df.to_csv(index=False)
+            
+            st.download_button(
+                label="📥 Download All Alerts (CSV)",
+                data=csv,
+                file_name=f"honeyshield_alerts_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+            
+        except Exception as e:
+            st.error(f"Export failed: {e}")
+    
+    def _test_alert_system(self):
+        """Test the alert system with a sample alert"""
+        try:
+            from src.alert_manager import AlertManager
+            alert_mgr = AlertManager()
+            
+            test_alert = {
+                'severity': 'HIGH',
+                'source_platform': 'LinkedIn',
+                'sender_name': 'TEST - Security System',
+                'sender_profile': 'https://linkedin.com/in/test-system',
+                'message_content': 'TEST ALERT: This is a test of the Honeyshield alert system. Everything is working correctly!',
+                'risk_score': 75,
+                'threat_type': 'System Test',
+                'indicators': 'Test indicator 1, Test indicator 2',
+                'recommended_action': 'This is a test alert. No action required.',
+                'ml_confidence': 0.95
+            }
+            
+            alert_mgr.create_alert(test_alert)
+            st.success("✅ Test alert created successfully! Check the Active Alerts section.")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"Test failed: {e}")
+    
+    def _clear_resolved_alerts(self):
+        """Clear all resolved alerts from database"""
+        try:
+            conn = sqlite3.connect('data/honeyshield.db')
+            cursor = conn.cursor()
+            
+            cursor.execute("DELETE FROM security_alerts WHERE status = 'RESOLVED'")
+            conn.commit()
+            conn.close()
+            
+            st.success("✅ All resolved alerts have been cleared")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"Error clearing resolved alerts: {e}")
+    
+    def _show_system_status(self):
+        """Show system status information"""
+        st.info("""
+        **System Status Overview:**
+        
+        ✅ **Dashboard**: Operational
+        ✅ **Database**: Connected
+        ✅ **Alert System**: Active
+        🔄 **Real-time Monitoring**: Ready
+        
+        **Last Check:** {}
+        **Total Alerts Processed:** {}
+        """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self.get_security_overview()['total_alerts']))
+    
+    def run(self):
+        """Run the security dashboard"""
+        # Initialize session state for expanded alerts
+        if 'alert_states' not in st.session_state:
+            st.session_state.alert_states = {}
+        
+        # Sidebar
+        with st.sidebar:
+            st.title("🛡️ Security Console")
             st.markdown("---")
-            st.markdown("**About**")
-            st.info("ML-First phishing detection using advanced behavioral analysis and threat classification.")
+            
+            st.markdown("### Quick Stats")
+            overview = self.get_security_overview()
+            if overview:
+                st.metric("Open Critical", overview['open_critical'])
+                st.metric("Open High", overview['open_high'])
+                st.metric("Total Alerts", overview['total_alerts'])
+            
+            st.markdown("---")
+            st.markdown("### Navigation")
+            page = st.radio("Go to:", ["Active Alerts", "Resolved Alerts", "Management"])
+            
+            st.markdown("---")
+            st.markdown("**Last Updated**")
+            st.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
-        # Main content
-        self.display_ml_insights_header()
+        # Main content based on navigation
+        self.display_security_header()
+        self.display_security_metrics(overview)
         
-        # Get statistics
-        stats = self.get_advanced_stats()
-        
-        # Display all sections
-        self.display_ml_metrics(stats)
-        
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📈 Analytics", 
-            "🔍 Detections", 
-            "🧪 Test ML", 
-            "💻 System"
-        ])
-        
-        with tab1:
-            self.display_risk_distribution_chart(stats)
-            self.display_threat_intelligence(stats)
-        
-        with tab2:
-            self.display_recent_detections()
-        
-        with tab3:
-            self.display_real_time_testing()
-        
-        with tab4:
-            self.display_system_health()
+        if page == "Active Alerts":
+            self.display_active_alerts_section()
+        elif page == "Resolved Alerts":
+            self.display_recently_resolved()
+        elif page == "Management":
+            self.display_alert_actions()
 
 # Main execution
 if __name__ == "__main__":
-    dashboard = MLFirstDashboard()
+    dashboard = AlertDashboard()
     dashboard.run()
